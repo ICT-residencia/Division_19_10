@@ -1,0 +1,1717 @@
+{
+ "T-001": {
+  "issue": 1,
+  "title": "Preparar ambiente de desenvolvimento local",
+  "state": "CLOSED",
+  "objective": "subir o projeto do zero na sua máquina e ver todos os gates da CI passarem localmente, antes de abrir qualquer PR.",
+  "depends": "",
+  "groups": [
+   {
+    "title": "Pronto quando",
+    "items": [
+     {
+      "id": "1twnpe2",
+      "text": "**Instalação limpa** — `pnpm install` termina sem aviso de build script bloqueado, e `git submodule status` mostra os dois submódulos presentes (sem `-` na frente)."
+     },
+     {
+      "id": "cv5w2n",
+      "text": "**Contêineres respondem** — `docker compose ps` mostra Postgres, MinIO e Anvil de pé, com Postgres e MinIO em `healthy`. O bucket do projeto existe e está privado (console do MinIO em http://localhost:9001)."
+     },
+     {
+      "id": "es8bb9",
+      "text": "**Banco aplica** — `prisma migrate dev` conecta e aplica a migração, lendo o `.env` da raiz."
+     },
+     {
+      "id": "4zmo4s",
+      "text": "**Contratos passam** — `pnpm contracts:test` e `pnpm contracts:coverage` terminam sem falha."
+     },
+     {
+      "id": "cv9afp",
+      "text": "**Build verde** — `pnpm -r lint`, `pnpm -r build` e `pnpm -r test` passam, rodados da raiz do monorepo."
+     },
+     {
+      "id": "57rigv",
+      "text": "**App sobe** — `pnpm dev` levanta os dois; Swagger abre em `/docs` e a home do Next.js carrega."
+     },
+     {
+      "id": "1tquaqh",
+      "text": "**Nada vazou** — `.env` existe na raiz, com os segredos locais preenchidos, e `git status` continua limpo."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [],
+  "evidence": "",
+  "decisions": ""
+ },
+ "T-002": {
+  "issue": 2,
+  "title": "Escrever ADR do contrato",
+  "state": "CLOSED",
+  "objective": "decidir por escrito, antes da primeira função real do contrato, o que é estado on-chain, quem pode chamar o quê, e como o registro muda de estado.",
+  "depends": "",
+  "groups": [
+   {
+    "title": "O que a ADR precisa decidir",
+    "items": [
+     {
+      "id": "1d6ofaw",
+      "text": "**Estado on-chain** — cada struct e mapping, campo a campo, com o tipo. Para cada campo, uma linha dizendo por que ele precisa estar na rede."
+     },
+     {
+      "id": "1twr5wr",
+      "text": "**Nada protegido on-chain** — tabela mostrando que nenhum campo viola a seção 6 do GUIA: nada de nome, CPF, razão social, documento completo ou dado comercial. Titular e instituição entram como referência pseudônima `bytes32`; documento entra como hash."
+     },
+     {
+      "id": "jigokz",
+      "text": "**Matriz de autorização** — para cada função, qual papel pode chamar, e o que acontece quando quem chama não tem o papel. As duas camadas: contrato (`AccessControl`) **e** aplicação (RBAC)."
+     },
+     {
+      "id": "8049st",
+      "text": "**Máquina de estados** — quais estados existem, quais transições são válidas, quais são irreversíveis, e qual delas devolve `InvalidState`."
+     },
+     {
+      "id": "jb8b0",
+      "text": "**Erros** — `Unauthorized`, `AlreadyExists`, `NotFound` e `InvalidState` mapeados para as situações concretas que os disparam."
+     },
+     {
+      "id": "11hj4zb",
+      "text": "**Eventos** — com parâmetros e quais são `indexed`. Confirme que nenhum parâmetro carrega dado protegido: evento é público e permanente."
+     },
+     {
+      "id": "4n5edc",
+      "text": "**O que fica fora do contrato** — o que vai para API/Postgres, com a razão. Consulta pública de leitura não pode exigir carteira."
+     },
+     {
+      "id": "1q1trl2",
+      "text": "**Impacto no planejamento** — o que a ADR obriga e proíbe nas tasks seguintes."
+     },
+     {
+      "id": "1m3l1st",
+      "text": "**Alternativas consideradas** — ao menos duas alternativas reais descartadas, com o motivo. Alternativa inventada para preencher não conta."
+     }
+    ]
+   },
+   {
+    "title": "Pronto quando",
+    "items": [
+     {
+      "id": "rmraga",
+      "text": "Existe `docs/adr/ADR-001-<titulo>.md`, seguindo `docs/adr/TEMPLATE.md`, com todas as seções preenchidas e `status: accepted`."
+     },
+     {
+      "id": "1fefetq",
+      "text": "Todos os itens de \"O que a ADR precisa decidir\" estão respondidos no documento."
+     },
+     {
+      "id": "1prnhzq",
+      "text": "**Nenhum arquivo em `contracts/src/` foi alterado** — `git diff --name-only main...HEAD` mostra só `docs/adr/`."
+     },
+     {
+      "id": "1q13j80",
+      "text": "A ADR não contém corpo de função em Solidity. Assinatura e declaração de struct sim; implementação não."
+     },
+     {
+      "id": "7tvphp",
+      "text": "Dá para escrever os testes do contrato lendo só a ADR, sem adivinhar. Cada transição inválida e cada chamada sem papel viram caso de teste depois."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [],
+  "evidence": "",
+  "decisions": ""
+ },
+ "T-003": {
+  "issue": 3,
+  "title": "Modelo de ameaças simplificado",
+  "state": "CLOSED",
+  "objective": "ter uma lista curta e escrita dos ataques que este MVP pode sofrer e de como cada um é mitigado — para a mitigação entrar no desenho, e não virar remendo depois da demo.",
+  "depends": "",
+  "groups": [
+   {
+    "title": "Pronto quando",
+    "items": [
+     {
+      "id": "1btqkw9",
+      "text": "**Cobre as quatro superfícies** — rede pública (qualquer um lê todo o estado e todos os eventos, para sempre), papéis do contrato (quem concede, quem revoga, o que acontece se uma chave vazar), backend (é onde mora o dado protegido) e a consulta pública sem autenticação."
+     },
+     {
+      "id": "185htha",
+      "text": "**Cada mitigação é concreta** — aponta para um papel, uma validação, um teste ou um campo que deixou de existir. \"Ter cuidado\" não é mitigação."
+     },
+     {
+      "id": "hv00l2",
+      "text": "**Risco aceito está marcado como aceito**, com a razão. Risco aceito é decisão válida; risco esquecido não."
+     },
+     {
+      "id": "anvt6w",
+      "text": "**Cabe em uma página.** Passou disso, está detalhando demais para o momento."
+     },
+     {
+      "id": "1rvbotn",
+      "text": "**Nenhum arquivo de código alterado** — `git diff --name-only main...HEAD` mostra só `docs/`."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [],
+  "evidence": "",
+  "decisions": ""
+ },
+ "T-004": {
+  "issue": 4,
+  "title": "Landing page de apresentação do MVP",
+  "state": "CLOSED",
+  "objective": "uma página pública que explica, para quem nunca viu o projeto, qual problema o MVP resolve, quem são os atores e como o fluxo funciona.",
+  "depends": "",
+  "groups": [
+   {
+    "title": "Pronto quando",
+    "items": [
+     {
+      "id": "1c0mbtl",
+      "text": "A página abre **sem login e sem carteira**."
+     },
+     {
+      "id": "1xncevp",
+      "text": "O conteúdo está em **linguagem própria da squad** — não é recorte do `GUIA.md`."
+     },
+     {
+      "id": "45t1e7",
+      "text": "Diz de forma visível que é **PoC em rede de teste, com dados fictícios**. Não pode passar por sistema em produção."
+     },
+     {
+      "id": "1f95vb5",
+      "text": "**Nenhum dado pessoal, real ou realista** — nem em exemplo, nem em mockup, nem em imagem. Exemplo usa dado obviamente falso."
+     },
+     {
+      "id": "1sgyijq",
+      "text": "Usa o Tailwind já configurado, **sem biblioteca nova** de UI, ícone ou animação."
+     },
+     {
+      "id": "126sms8",
+      "text": "Funciona em celular e desktop, com o texto legível nos dois."
+     },
+     {
+      "id": "xiwb5f",
+      "text": "Existe teste de renderização, no padrão de `apps/web/app/page.test.tsx`."
+     },
+     {
+      "id": "1qixjzy",
+      "text": "`pnpm -r lint`, `pnpm -r build` e `pnpm -r test` passam."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [],
+  "evidence": "",
+  "decisions": ""
+ },
+ "T-005": {
+  "issue": 9,
+  "title": "ADR-002: custódia de chaves e vínculo usuário-conta operacional",
+  "state": "CLOSED",
+  "objective": "Decidir e registrar, em ADR aceita, onde vive a chave privada de cada papel do contrato e como o usuário autenticado no backend se liga à conta operacional que age por ele on-chain.",
+  "depends": "",
+  "groups": [
+   {
+    "title": "Critérios de aceite",
+    "items": [
+     {
+      "id": "ql8k3d",
+      "text": "Existe `docs/adr/0002-<titulo-em-kebab-case>.md`, do `TEMPLATE.md`, com quatro dígitos e sem prefixo `ADR-`."
+     },
+     {
+      "id": "qoj24c",
+      "text": "Cabeçalho com `Status: aceita`, data, decisores e PR relacionado, e o campo `**Por quê:**` preenchido."
+     },
+     {
+      "id": "1spj350",
+      "text": "Pelo menos duas opções reais de custódia de chave, com prós e contras."
+     },
+     {
+      "id": "1vtxmae",
+      "text": "A decisão diz, papel a papel (`DEFAULT_ADMIN_ROLE`, `ACCREDITATION_AUTHORITY_ROLE`, `ICT_ROLE`, `AUDITOR_ROLE`), onde vive a chave e quem assina."
+     },
+     {
+      "id": "145hzw0",
+      "text": "Respeita a ADR-001: uma conta operacional por ICT, nunca compartilhada."
+     },
+     {
+      "id": "1vn7q3r",
+      "text": "Nomeia `walletAddress` e diz em qual model ele vive. Guarda endereço, nunca chave privada."
+     },
+     {
+      "id": "1yjfy2h",
+      "text": "Lista os papéis de aplicação, mapeando cada um para o ator do GUIA e para o papel on-chain."
+     },
+     {
+      "id": "85dq78",
+      "text": "Seção de segurança responde se a aplicação guarda alguma chave e o que um vazamento permitiria."
+     },
+     {
+      "id": "17lhioz",
+      "text": "Escolhe entre `bcrypt` e `argon2` e justifica, porque a stack é congelada."
+     },
+     {
+      "id": "1phvhu5",
+      "text": "Declara que a consulta pública continua sem login e sem carteira."
+     },
+     {
+      "id": "onm1qt",
+      "text": "Não muda nada da matriz de autorização da ADR-001."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [],
+  "evidence": "O arquivo da ADR no PR, conferido lado a lado com o `TEMPLATE.md` e com as seções \"Signers\" e \"Autorização\" da ADR-001, que são o limite do que esta ADR pode decidir.",
+  "decisions": ""
+ },
+ "T-006": {
+  "issue": 10,
+  "title": "Vínculo da ICT, quinto erro e registerICT",
+  "state": "CLOSED",
+  "objective": "Sair do esqueleto e entregar a primeira fatia do domínio: uma ICT passa a ter uma conta operacional vinculada à sua referência pseudônima, e o contrato consegue responder, a partir de `msg.sender`, por qual ICT a chamada está agindo. Sem isso, nenhuma checagem de escopo das tasks seguintes funciona.",
+  "depends": "",
+  "groups": [
+   {
+    "title": "Critérios de aceite",
+    "items": [
+     {
+      "id": "u8fl2l",
+      "text": "Ao lado dos quatro erros que o esqueleto já declara, passa a existir um quinto, `InvalidInput()`, sem parâmetros, como a ADR-001 exige."
+     },
+     {
+      "id": "4p4m3k",
+      "text": "O construtor, que hoje reverte `Unauthorized()` quando `admin == address(0)`, passa a reverter `InvalidInput()`."
+     },
+     {
+      "id": "1g67w96",
+      "text": "Passam a existir os dois mappings de vínculo, `ictRef → account` e `account → ictRef`, mantidos em sincronia."
+     },
+     {
+      "id": "19t8hje",
+      "text": "Passa a existir `registerICT(bytes32 ictRef)`, exigindo `ICT_ROLE`, criando o vínculo 1:1 e emitindo o evento `ICTRegistered`, que também é novo."
+     },
+     {
+      "id": "qppgve",
+      "text": "Reverte `Unauthorized` sem o papel, `InvalidInput` para `ictRef` zero, e `AlreadyExists` em dois casos distintos."
+     },
+     {
+      "id": "4idslh",
+      "text": "O vínculo é 1:1 de verdade: dois testes, um por sentido."
+     },
+     {
+      "id": "p8f3gy",
+      "text": "O contrato não gera nem valida entropia de `ictRef`. Só recebe e armazena."
+     },
+     {
+      "id": "1oh7ji1",
+      "text": "Teste negativo com `DEFAULT_ADMIN_ROLE`, que também precisa reverter."
+     },
+     {
+      "id": "emye2y",
+      "text": "Os dois testes que já existem, sobre o construtor e os papéis, continuam passando."
+     },
+     {
+      "id": "j69770",
+      "text": "`forge test -vvv` passa 100% e `forge fmt --check` não acusa diferença."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [
+   "Conta sem `ICT_ROLE` → `Unauthorized`.",
+   "Conta com `DEFAULT_ADMIN_ROLE` mas sem `ICT_ROLE` → `Unauthorized`. Governança não dá permissão de domínio.",
+   "`ictRef == bytes32(0)` → `InvalidInput`.",
+   "Mesmo `ictRef`, segunda conta → `AlreadyExists`.",
+   "Mesma conta, segundo `ictRef` → `AlreadyExists`.",
+   "Construtor com `address(0)` → `InvalidInput`, que substitui o `Unauthorized` do esqueleto."
+  ],
+  "evidence": "`forge test -vvv` verde, `forge fmt --check` limpo, e no PR a menção explícita dos dois testes de unicidade do vínculo, um por sentido.",
+  "decisions": ""
+ },
+ "T-007": {
+  "issue": 11,
+  "title": "Solicitação de habilitação e decisão",
+  "state": "CLOSED",
+  "objective": "Uma ICT envia solicitação de habilitação e o órgão credenciador registra decisões sobre ela, com cada decisão preservada como fato histórico no evento.",
+  "depends": "",
+  "groups": [
+   {
+    "title": "Critérios de aceite",
+    "items": [
+     {
+      "id": "1pst14l",
+      "text": "`enum Area` com os cinco valores e `enum ApplicationStatus` com os três, nas ordens da ADR."
+     },
+     {
+      "id": "cs1es6",
+      "text": "Struct `Application`, contador global e mapping de `applicationId` para `Application`."
+     },
+     {
+      "id": "1fytxsv",
+      "text": "`applicationId` começa em 1, com `0` como sentinela de não atribuído."
+     },
+     {
+      "id": "1fe3wcq",
+      "text": "Existe `latestApplicationIdByICT`, atualizado a cada submissão."
+     },
+     {
+      "id": "px8ma1",
+      "text": "`submitApplication` exige `ICT_ROLE` **e** que `msg.sender` seja a conta vinculada ao `ictRef`."
+     },
+     {
+      "id": "113hai2",
+      "text": "Reverte `Unauthorized` sem papel e em tentativa cross-ICT, `NotFound` para ICT não registrada, `InvalidState` se já existe habilitação."
+     },
+     {
+      "id": "cmzwbj",
+      "text": "Várias solicitações antes da primeira habilitação, cada nova virando a latest."
+     },
+     {
+      "id": "1uq2mi6",
+      "text": "`recordDecision` exige `ACCREDITATION_AUTHORITY_ROLE`, atualiza o status e emite `DecisionRecorded`."
+     },
+     {
+      "id": "u3p1aj",
+      "text": "Decisões repetidas são permitidas: teste com três decisões seguidas sobre a mesma solicitação."
+     },
+     {
+      "id": "1tj3u3o",
+      "text": "**Nenhum `decisionId` nem `Decision[]`.** Verificável por ausência."
+     },
+     {
+      "id": "j69770",
+      "text": "`forge test -vvv` passa 100% e `forge fmt --check` não acusa diferença."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [
+   "ICT com `ICT_ROLE` tentando enviar em nome de outra ICT → `Unauthorized`. Este é o teste mais importante da task.",
+   "`ictRef` nunca registrado → `NotFound`.",
+   "Nova solicitação depois que a ICT já tem habilitação → `InvalidState`.",
+   "`recordDecision` por quem não tem `ACCREDITATION_AUTHORITY_ROLE`, inclusive uma ICT → `Unauthorized`.",
+   "`applicationId` inexistente ou igual a zero → `NotFound`."
+  ],
+  "evidence": "`forge test -vvv` verde, `forge fmt --check` limpo, e no PR a lista dos casos de erro cobertos, um por linha da matriz erro por operação da ADR-001.",
+  "decisions": ""
+ },
+ "T-008": {
+  "issue": 12,
+  "title": "Ativação da habilitação",
+  "state": "CLOSED",
+  "objective": "Uma solicitação aprovada vira a primeira habilitação da ICT, com período de vigência registrado, e nenhuma ICT consegue ter duas primeiras habilitações.",
+  "depends": "",
+  "groups": [
+   {
+    "title": "Critérios de aceite",
+    "items": [
+     {
+      "id": "b75kbs",
+      "text": "Struct `Accreditation`, contador global e mapping de `accreditationId` para `Accreditation`."
+     },
+     {
+      "id": "18k8g51",
+      "text": "`accreditationId` começa em 1, com `0` como sentinela."
+     },
+     {
+      "id": "2l7vxj",
+      "text": "Existe `latestAccreditationIdByICT`, o head da cadeia, atualizado aqui."
+     },
+     {
+      "id": "1korbb9",
+      "text": "`activateAccreditation` exige `ACCREDITATION_AUTHORITY_ROLE`, cria com `previousAccreditationId == 0`, marca a solicitação e emite `AccreditationActivated`."
+     },
+     {
+      "id": "1td3j5j",
+      "text": "Sete casos de reversão, cada um com seu teste."
+     },
+     {
+      "id": "1afspz2",
+      "text": "A vigência é o intervalo semiaberto `[validFrom, validUntil)`. Vigência futura é permitida."
+     },
+     {
+      "id": "15is7t6",
+      "text": "**Nenhum status, `expired` ou `active` persistido.** Verificável por ausência."
+     },
+     {
+      "id": "1y8bfv2",
+      "text": "Após reversão nada fica gravado: contador e head intactos."
+     },
+     {
+      "id": "j69770",
+      "text": "`forge test -vvv` passa 100% e `forge fmt --check` não acusa diferença."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [
+   "Sem o papel, ou com `ICT_ROLE`, ou com `DEFAULT_ADMIN_ROLE` → `Unauthorized`.",
+   "Solicitação inexistente → `NotFound`.",
+   "Solicitação que deixou de ser a mais recente → `InvalidState`.",
+   "Solicitação `PENDENTE` ou `INDEFERIDA` → `InvalidState`.",
+   "ICT que já tem habilitação → `AlreadyExists`.",
+   "Solicitação que já originou habilitação → `AlreadyExists`.",
+   "`validUntil <= validFrom` → `InvalidInput`."
+  ],
+  "evidence": "`forge test -vvv` verde, `forge fmt --check` limpo, e no PR um teste nomeado por linha da lista de pré-condições da ADR-001. Sete pré-condições, sete testes.",
+  "decisions": ""
+ },
+ "T-009": {
+  "issue": 13,
+  "title": "Auditoria e renovação encadeada",
+  "state": "CLOSED",
+  "objective": "O órgão credenciador registra auditorias sobre uma habilitação e cria renovações encadeadas à habilitação anterior, formando uma única cadeia por ICT.",
+  "depends": "",
+  "groups": [
+   {
+    "title": "Critérios de aceite",
+    "items": [
+     {
+      "id": "1rdtij2",
+      "text": "`enum AuditResult { CONFORME, NAO_CONFORME }`, nessa ordem."
+     },
+     {
+      "id": "1nzrzhi",
+      "text": "`recordAudit` exige `ACCREDITATION_AUTHORITY_ROLE` e emite `AuditRecorded`."
+     },
+     {
+      "id": "1g9snn4",
+      "text": "`recordAudit` **não altera nenhum estado**: teste com `NAO_CONFORME` confere vigência, head e contadores intactos."
+     },
+     {
+      "id": "1745jc0",
+      "text": "Auditorias repetidas são permitidas."
+     },
+     {
+      "id": "ets7fa",
+      "text": "**Nenhum `auditId` nem `Audit[]`.** Verificável por ausência."
+     },
+     {
+      "id": "qa7epy",
+      "text": "`renewAccreditation` cria habilitação que **herda o `ictRef` da predecessora** e vira o novo head."
+     },
+     {
+      "id": "1x9xibz",
+      "text": "O `ictRef` não é parâmetro: renovação entre ICTs é estruturalmente impossível."
+     },
+     {
+      "id": "1pgw9qq",
+      "text": "Cinco casos de reversão, cada um com seu teste."
+     },
+     {
+      "id": "1ord9wr",
+      "text": "Continuidade exata e lacuna entre vigências são as duas permitidas: dois testes."
+     },
+     {
+      "id": "15fl869",
+      "text": "Renovar a partir de head futuro e de head vencido são os dois permitidos."
+     },
+     {
+      "id": "1jszm98",
+      "text": "Profundidade ilimitada: teste com três renovações, percorrendo a cadeia de volta."
+     },
+     {
+      "id": "j69770",
+      "text": "`forge test -vvv` passa 100% e `forge fmt --check` não acusa diferença."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [
+   "`recordAudit` por conta com `AUDITOR_ROLE` → `Unauthorized`. O papel não escreve no contrato.",
+   "`accreditationId` inexistente ou zero → `NotFound`.",
+   "Renovar duas vezes a partir da mesma predecessora → `AlreadyExists` na segunda, porque ela deixou de ser o head.",
+   "`validUntil <= validFrom` → `InvalidInput`.",
+   "`validFrom` antes do `validUntil` da predecessora → `InvalidInput` por sobreposição."
+  ],
+  "evidence": "`forge test -vvv` verde, `forge fmt --check` limpo, e no PR os dois testes de fronteira temporal nomeados: continuidade exata e lacuna. Registre também quantos níveis de cadeia você testou.",
+  "decisions": ""
+ },
+ "T-010": {
+  "issue": 14,
+  "title": "Consulta pública do status atual",
+  "state": "CLOSED",
+  "objective": "Qualquer pessoa consulta a situação atual de uma ICT sem carteira e sem login. O contrato do MVP fica funcionalmente completo.",
+  "depends": "",
+  "groups": [
+   {
+    "title": "Critérios de aceite",
+    "items": [
+     {
+      "id": "11y85sb",
+      "text": "`enum ICTCurrentStatus` com os sete valores, na ordem da ADR."
+     },
+     {
+      "id": "t84i2o",
+      "text": "`getCurrentStatus(bytes32 ictRef) external view` sem `onlyRole`, lançando apenas `NotFound`."
+     },
+     {
+      "id": "ai819m",
+      "text": "Teste provando que endereço sem nenhum papel consegue chamar e receber resposta."
+     },
+     {
+      "id": "199l54x",
+      "text": "Um teste por linha da tabela \"Máquina de estados e vigência\" da ADR: sete casos."
+     },
+     {
+      "id": "4c091k",
+      "text": "Lacuna entre predecessora encerrada e sucessora futura devolve `VENCIDA`, não `NAO_INICIADA`."
+     },
+     {
+      "id": "ors4ql",
+      "text": "Fronteira do intervalo: em `validFrom` é `HABILITADA`; em `validUntil` já não é."
+     },
+     {
+      "id": "10ed92u",
+      "text": "A função não grava nada: duas chamadas com `vm.warp` entre elas, resultados diferentes, nenhuma transação."
+     },
+     {
+      "id": "xss1yb",
+      "text": "A travessia funciona em cadeia com três renovações."
+     },
+     {
+      "id": "j69770",
+      "text": "`forge test -vvv` passa 100% e `forge fmt --check` não acusa diferença."
+     },
+     {
+      "id": "uc0pya",
+      "text": "Cobertura de linhas em 80% ou mais para `ICTAccreditationRegistry.sol`."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [
+   "`ictRef` nunca registrado → `NotFound`.",
+   "Status calculado a partir só do head, sem travessia → erra o caso de lacuna, que precisa devolver `VENCIDA`.",
+   "`<=` no lugar de `<` na comparação de `validUntil` → ICT fica habilitada um instante a mais do que deveria.",
+   "Qualquer persistência do status calculado → reprovado."
+  ],
+  "evidence": "`forge test -vvv` verde, `forge fmt --check` limpo, e a saída de `forge coverage --report summary` mostrando a linha de `ICTAccreditationRegistry.sol` com 80% ou mais. Sem essa saída no PR a task não está pronta.",
+  "decisions": ""
+ },
+ "T-011": {
+  "issue": 15,
+  "title": "Prisma no Nest, model User e seed",
+  "state": "CLOSED",
+  "objective": "A API passa a conversar com o Postgres, existe a tabela de usuário com senha guardada como hash, e o seed cria usuários de exemplo para o time conseguir logar na próxima task.",
+  "depends": "",
+  "groups": [
+   {
+    "title": "Critérios de aceite",
+    "items": [
+     {
+      "id": "3fyzjv",
+      "text": "Existem `PrismaService` e `PrismaModule` em `apps/api/src/prisma/`, importados pelo `AppModule`."
+     },
+     {
+      "id": "zalx2w",
+      "text": "`model User` com `id`, `email` único, `passwordHash`, `role` e `walletAddress` opcional e único."
+     },
+     {
+      "id": "1mfai5x",
+      "text": "`role` é enum do Prisma com os papéis que a ADR-002 definiu, cobrindo ICT, órgão credenciador e auditor."
+     },
+     {
+      "id": "v540uq",
+      "text": "`prisma migrate dev` roda sem erro e a migration é commitada."
+     },
+     {
+      "id": "arzkaf",
+      "text": "`seed.ts` cria ao menos um usuário de cada papel, com senha documentada e endereço de exemplo válido."
+     },
+     {
+      "id": "yo42yl",
+      "text": "O seed é idempotente: rodar duas vezes não quebra e não duplica."
+     },
+     {
+      "id": "256r62",
+      "text": "`apps/api/package.json` ganha `prisma:generate`, `prisma:migrate` e `prisma:seed`."
+     },
+     {
+      "id": "pjqhg0",
+      "text": "Teste provando que o valor gravado não é a senha em texto, e que a verificação aceita a certa e recusa a errada."
+     },
+     {
+      "id": "1ivxcv3",
+      "text": "Nenhuma senha, hash ou segredo em log."
+     },
+     {
+      "id": "18zd5w8",
+      "text": "`pnpm -r lint` e `pnpm -r build` passam."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [
+   "Rodar o seed duas vezes → não pode quebrar nem duplicar usuário.",
+   "Senha gravada em texto, ou hash com algoritmo rápido tipo `sha256` → reprovado. Use a biblioteca que a ADR-002 escolheu, nunca `crypto.createHash`.",
+   "Teste que dependa de Postgres no ar dentro de `pnpm -r test` → reprovado, a CI não sobe banco.",
+   "Duplicar a configuração que já está em `apps/api/prisma.config.ts` → reprovado."
+  ],
+  "evidence": "Saída de `prisma migrate dev`, saída do seed rodado duas vezes sem erro, e a saída do teste de hash. Print do banco com a coluna de senha mostrando hash, nunca texto legível.",
+  "decisions": ""
+ },
+ "T-012": {
+  "issue": 16,
+  "title": "Login, emissão de JWT e guard",
+  "state": "OPEN",
+  "objective": "Um usuário do seed troca email e senha por um JWT em `POST /auth/login`, e uma rota protegida só responde para quem apresenta esse token.",
+  "depends": "",
+  "groups": [
+   {
+    "title": "Critérios de aceite",
+    "items": [
+     {
+      "id": "1i5rkq7",
+      "text": "Módulo de autenticação em `apps/api/src/auth/`, importado pelo `AppModule`."
+     },
+     {
+      "id": "rqcdja",
+      "text": "`POST /auth/login` com DTO validado por `class-validator`."
+     },
+     {
+      "id": "otdjle",
+      "text": "Resposta exatamente no formato `{ accessToken, user: { id, email, role, walletAddress } }`. `passwordHash` nunca aparece."
+     },
+     {
+      "id": "2da1rf",
+      "text": "Credencial inválida responde 401 com a **mesma** mensagem, seja email inexistente ou senha errada."
+     },
+     {
+      "id": "4bvs92",
+      "text": "Segredo e expiração vêm de `JWT_SECRET` e `JWT_EXPIRES_IN` via `ConfigService`. Segredo vazio derruba a subida da API."
+     },
+     {
+      "id": "2x38u5",
+      "text": "`GET /auth/me` protegida: 401 sem token, 401 com token inválido, 200 com token válido."
+     },
+     {
+      "id": "11rkqrp",
+      "text": "As duas rotas aparecem no Swagger em `/docs`, com a protegida marcada como bearer."
+     },
+     {
+      "id": "1wsz0on",
+      "text": "Nenhuma senha, hash ou token em log."
+     },
+     {
+      "id": "oooos4",
+      "text": "Testes unitários rodando sem banco, cobrindo os três casos de login."
+     },
+     {
+      "id": "1qixjzy",
+      "text": "`pnpm -r lint`, `pnpm -r build` e `pnpm -r test` passam."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [
+   "Senha errada → 401. Email inexistente → 401 com a mesma mensagem. O teste compara as duas mensagens, não só o status.",
+   "`GET /auth/me` sem cabeçalho de autorização → 401.",
+   "Token expirado ou assinado com outro segredo → 401.",
+   "Campo extra no corpo do login → rejeitado pelo `ValidationPipe` global."
+  ],
+  "evidence": "`pnpm -r test` verde, print do Swagger em `/docs` com as duas rotas, e os três `curl` do roteiro da task: login devolvendo token, `me` com token em 200, `me` sem token em 401.",
+  "decisions": ""
+ },
+ "T-013": {
+  "issue": 17,
+  "title": "Models de domínio",
+  "state": "OPEN",
+  "objective": "O Postgres passa a ter as tabelas de domínio do credenciamento, cobrindo exatamente o que a ADR-001 atribuiu ao banco e nada do que ela atribuiu à blockchain.",
+  "depends": "",
+  "groups": [
+   {
+    "title": "Critérios de aceite",
+    "items": [
+     {
+      "id": "15tqaok",
+      "text": "`model ICT` com identidade real, contatos, `ictRef` único e a conta operacional vinculada."
+     },
+     {
+      "id": "1bewebi",
+      "text": "`ictRef` gerado pelo backend com alta entropia, nunca derivado de CNPJ ou razão social."
+     },
+     {
+      "id": "mlu6kd",
+      "text": "Model para os arquivos protegidos, com metadados, chave no MinIO e o hash que vai on-chain."
+     },
+     {
+      "id": "1tlllke",
+      "text": "Model espelhando a solicitação, com o `applicationId` on-chain, área e `documentHash`."
+     },
+     {
+      "id": "2q18o2",
+      "text": "Model espelhando a habilitação, com `accreditationId`, vigência e ponteiro para a predecessora."
+     },
+     {
+      "id": "t2dg7b",
+      "text": "Models para o parecer da decisão e para o relatório de auditoria, com hash e referência ao arquivo."
+     },
+     {
+      "id": "armyrj",
+      "text": "**Nenhum status é fonte da verdade.** Se houver cache, chama-se `statusCache` com `statusCacheAt` e comentário citando a ADR-001."
+     },
+     {
+      "id": "l7u17c",
+      "text": "Campos que espelham `bytes32` guardam hexadecimal com prefixo `0x`, documentado em comentário."
+     },
+     {
+      "id": "v540uq",
+      "text": "`prisma migrate dev` roda sem erro e a migration é commitada."
+     },
+     {
+      "id": "1rma9f2",
+      "text": "O seed de T-011 é estendido para um cenário mínimo completo, e continua idempotente."
+     },
+     {
+      "id": "18zd5w8",
+      "text": "`pnpm -r lint` e `pnpm -r build` passam."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [
+   "`ictRef` derivado de CNPJ ou razão social → reprovado. A ADR-001 é explícita: a opacidade vem da",
+   "Campo de status tratado como autoridade → reprovado. O status vem de `getCurrentStatus` no",
+   "Tabela de decisão ou de auditoria como histórico autoritativo → reprovado. Esse histórico vive",
+   "Migration que apaga ou renomeia coluna criada em T-011 sem intenção → reprovado."
+  ],
+  "evidence": "Saída de `prisma migrate dev`, saída do seed rodado duas vezes, e no PR a conferência campo a campo contra a seção \"Fronteira off-chain\" da ADR-001. Campo indefinido entra como **pendente**, nunca declarado conforme.",
+  "decisions": ""
+ },
+ "T-014": {
+  "issue": 18,
+  "title": "Casca do app com navegação lateral",
+  "state": "CLOSED",
+  "objective": "Existe o layout da área interna, com navegação lateral funcionando, e as telas seguintes só precisam preencher o conteúdo.",
+  "depends": "",
+  "groups": [
+   {
+    "title": "Critérios de aceite",
+    "items": [
+     {
+      "id": "fo2629",
+      "text": "`apps/web/app/(app)/layout.tsx` com navegação lateral persistente e área de conteúdo."
+     },
+     {
+      "id": "13rjbpz",
+      "text": "Ao menos duas páginas dentro de `(app)`, mesmo que placeholder."
+     },
+     {
+      "id": "3zal89",
+      "text": "O item da rota atual aparece ativo, com `aria-current=\"page\"`, e não só por cor."
+     },
+     {
+      "id": "82w334",
+      "text": "Em tela estreita a navegação colapsa, vira menu ou dá lugar a outra forma de navegar."
+     },
+     {
+      "id": "1onjzvy",
+      "text": "Navegação alcançável por teclado, com nome acessível no botão de abrir e fechar, se houver."
+     },
+     {
+      "id": "xwn2dp",
+      "text": "Marcação semântica com `<nav>` e `<main>`. O papel `main` precisa continuar existindo."
+     },
+     {
+      "id": "95iyts",
+      "text": "Contraste AA no tema claro e no escuro."
+     },
+     {
+      "id": "v8l3rp",
+      "text": "Teste com Vitest provando que os itens renderizam e que o item ativo está marcado."
+     },
+     {
+      "id": "bwbm5p",
+      "text": "Se adicionar dependência, vem com ADR nova. Se for só Tailwind, nenhuma ADR é necessária."
+     },
+     {
+      "id": "1qixjzy",
+      "text": "`pnpm -r lint`, `pnpm -r build` e `pnpm -r test` passam."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [
+   "Item ativo indicado só por cor → reprovado por acessibilidade.",
+   "Navegação inalcançável por teclado → reprovado.",
+   "Navegação ocupando a tela toda no celular → reprovado.",
+   "Biblioteca de componentes adicionada sem ADR → reprovado, a stack é congelada."
+  ],
+  "evidence": "`pnpm -r test` verde, e prints da área interna em tela larga e estreita, mostrando o item ativo. Se houver dependência nova, o arquivo da ADR no mesmo PR.",
+  "decisions": ""
+ },
+ "T-015": {
+  "issue": 19,
+  "title": "Sessão de login, cookie e logout",
+  "state": "OPEN",
+  "objective": "O usuário entra pelo formulário de login, a sessão sobrevive ao recarregar a página, a área interna fica fechada para quem não entrou, e o botão de sair encerra a sessão.",
+  "depends": "",
+  "groups": [
+   {
+    "title": "Critérios de aceite",
+    "items": [
+     {
+      "id": "nqdyke",
+      "text": "Página de login em `apps/web/app/(public)/login/`."
+     },
+     {
+      "id": "pm5wfh",
+      "text": "O envio passa por um route handler do Next, não chama a API direto do componente de cliente."
+     },
+     {
+      "id": "ndyfhd",
+      "text": "Token em cookie `httpOnly`, `sameSite: 'lax'`, `path: '/'`, `secure` fora de desenvolvimento. Nunca em `localStorage`."
+     },
+     {
+      "id": "170h1q8",
+      "text": "O tempo de vida do cookie acompanha a expiração do token."
+     },
+     {
+      "id": "d53e0t",
+      "text": "Middleware do Next protege `(app)` e redireciona para o login. `(public)` continua aberto."
+     },
+     {
+      "id": "17g1jww",
+      "text": "Após entrar, o usuário cai em `(app)`, e recarregar mantém a sessão."
+     },
+     {
+      "id": "1swrkpw",
+      "text": "A casca mostra quem está logado e um botão de sair, que apaga o cookie e volta ao login."
+     },
+     {
+      "id": "1o5u0le",
+      "text": "Credencial inválida mostra erro na tela, sem detalhe técnico e sem dizer se o email existe."
+     },
+     {
+      "id": "2s7ik3",
+      "text": "Nenhum token na URL, em log do navegador ou em atributo do HTML."
+     },
+     {
+      "id": "yesrz8",
+      "text": "Testes com Vitest, com a rede mockada, cobrindo formulário, erro e logout."
+     },
+     {
+      "id": "1qixjzy",
+      "text": "`pnpm -r lint`, `pnpm -r build` e `pnpm -r test` passam."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [
+   "Abrir rota de `(app)` sem cookie → redireciona para o login.",
+   "Abrir rota de `(public)` sem cookie → **continua acessível**. O RF07 exige consulta pública sem login.",
+   "Sair e voltar pelo histórico do navegador → não devolve acesso.",
+   "Senha errada → mensagem genérica, sem revelar se o email está cadastrado.",
+   "Token guardado em `localStorage` → reprovado.",
+   "Logout que só limpa estado da memória e deixa o cookie → reprovado."
+  ],
+  "evidence": "`pnpm -r test` verde, mais o roteiro manual de sete passos descrito no PR: rota protegida sem login, entrar, recarregar, cookie marcado como `HttpOnly` no navegador, sair e voltar pelo histórico, senha errada, e rota pública ainda acessível sem login.",
+  "decisions": ""
+ },
+ "T-016": {
+  "issue": 28,
+  "title": "Gate de 80% de cobertura dos contratos na CI",
+  "state": "OPEN",
+  "objective": "O job `contracts` da CI passa a falhar quando a cobertura de linhas de `src/ICTAccreditationRegistry.sol` fica abaixo de 80%, como o guia pede. Hoje o `forge coverage --report summary` só imprime a tabela e nunca falha. De quebra, sai o contrato de exemplo `Counter`, que sobrou do scaffold e distorce a métrica.",
+  "depends": "Não depende de outra task.",
+  "groups": [
+   {
+    "title": "Critérios de aceite",
+    "items": [
+     {
+      "id": "19qpwh7",
+      "text": "`Counter.sol`, `Counter.s.sol` e `Counter.t.sol` removidos. `git grep -n Counter -- contracts` não retorna nada, e `forge build --sizes` e `forge test` seguem verdes."
+     },
+     {
+      "id": "1ogl3ls",
+      "text": "`contracts/ci/check-coverage.sh` roda `forge coverage --report lcov`, lê o registro `SF:src/ICTAccreditationRegistry.sol` e calcula `LH/LF * 100`."
+     },
+     {
+      "id": "lblkba",
+      "text": "O script imprime o percentual medido e o mínimo exigido. Sai com 0 se atingir o mínimo e com código diferente de 0 se não atingir."
+     },
+     {
+      "id": "dotb90",
+      "text": "O mínimo é 80 por padrão e pode ser trocado por `MIN_LINE_COVERAGE`. Com `101` falha; com `80` passa na `main` atual."
+     },
+     {
+      "id": "pc382d",
+      "text": "Se o contrato não aparece no lcov (renomeado, removido, build quebrado), o script falha com mensagem explícita, em vez de passar por ausência."
+     },
+     {
+      "id": "1ee3vz4",
+      "text": "Em `.github/workflows/ci.yml`, o job `contracts` roda o script depois de `forge test -vvv`, sem remover `forge fmt --check`, `forge build --sizes` e `forge test`."
+     },
+     {
+      "id": "1mc9h24",
+      "text": "`lcov.info` não é commitado. Confira o `contracts/.gitignore`."
+     },
+     {
+      "id": "4aljzd",
+      "text": "O README explica o gate: valor, variável de override e como rodar local."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [
+   "Cobertura abaixo do mínimo → job vermelho, com o número medido no log.",
+   "Arquivo do contrato ausente no lcov → falha. Passar em silêncio está reprovado.",
+   "Cobertura medida abaixo de 80% na `main` → registre isso como dúvida na PR. **Não escreva testes do contrato nesta task.**",
+   "Alterar `ICTAccreditationRegistry.sol` ou o teste dele → fora do escopo, reprovado."
+  ],
+  "evidence": "Saídas coladas na PR: o script passando com o padrão, falhando com `MIN_LINE_COVERAGE=101` e falhando quando o arquivo esperado não existe (renomeie localmente e restaure), mais o `git grep Counter` vazio e o job `contracts` verde na branch.",
+  "decisions": "- Escrever o script em shell POSIX ou em bash. Nenhuma dependência nova, em nenhum dos dois casos. - Manter ou não o passo antigo `forge coverage --report summary` no job, só pelo log legível. - Apontar o `contracts:coverage` da raiz para o gate ou criar um `contracts:coverage:check` novo, sem quebrar o existente."
+ },
+ "T-017": {
+  "issue": 29,
+  "title": "ABI e bytecode do contrato em packages/shared",
+  "state": "OPEN",
+  "objective": "`packages/shared` passa a exportar a ABI e o bytecode do `ICTAccreditationRegistry`, junto com a lista de redes suportadas. Esses arquivos são gerados a partir do build do Foundry por um script versionado, e a CI falha se o arquivo commitado divergir do contrato. A API e o front passam a consumir o contrato por uma fonte única.",
+  "depends": "Não depende de outra task.",
+  "groups": [
+   {
+    "title": "Critérios de aceite",
+    "items": [
+     {
+      "id": "1pzxob0",
+      "text": "`packages/shared/src/contracts/ict-accreditation-registry.ts` exporta `ictAccreditationRegistryAbi` (`as const`) e `ictAccreditationRegistryBytecode` (`` `0x${string}` ``), com o cabeçalho \"GERADO por <script>; não edite à mão\"."
+     },
+     {
+      "id": "2fb8yh",
+      "text": "A ABI contém `registerICT`, `accountByICT`, `ictByAccount`, `hasRole`, `grantRole`, `revokeRole`, as quatro constantes de papel, o evento `ICTRegistered` (`ictRef` e `account` indexados) e os erros `Unauthorized`, `AlreadyExists`, `NotFound`, `InvalidState`, `InvalidInput`."
+     },
+     {
+      "id": "830khp",
+      "text": "`packages/shared/src/chains.ts` exporta `SUPPORTED_CHAINS` com exatamente `31337` e `11155111` (id e nome), e o `index.ts` reexporta tudo."
+     },
+     {
+      "id": "yw6zfn",
+      "text": "`packages/shared/scripts/generate-contract-artifacts.mjs`, em Node sem dependência externa, gera o arquivo a partir de `contracts/out/.../ICTAccreditationRegistry.json` (só `abi` e `bytecode.object`)."
+     },
+     {
+      "id": "1gkhqu7",
+      "text": "Com `--check`, o script gera em memória, compara com o arquivo commitado e falha dizendo se a divergência está na ABI ou no bytecode."
+     },
+     {
+      "id": "nzvope",
+      "text": "O job `contracts` do CI ganha `setup-node` (Node 24), roda `forge build` e depois o `--check`."
+     },
+     {
+      "id": "sj315a",
+      "text": "Gerar duas vezes depois de `forge clean` produz arquivos idênticos byte a byte. Se o bytecode não for reprodutível, registre na PR. Não desligue o `--check` do bytecode."
+     },
+     {
+      "id": "o48pcp",
+      "text": "`pnpm -r build` e `pnpm -r test` verdes, sem dependência nova em `packages/shared/package.json`."
+     },
+     {
+      "id": "oqx60u",
+      "text": "O README diz como regenerar e que o arquivo gerado é commitado."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [
+   "Mudar uma função do contrato sem regenerar → `--check` falha no CI.",
+   "Editar o arquivo gerado à mão → `--check` falha.",
+   "Renomear parâmetro ou evento \"para ficar bonito\" → reprovado. A ABI é o reflexo exato do `.sol`, e esses nomes chegam direto à API e ao front.",
+   "Gerador instável (diff a cada execução) → trava toda PR de contrato. Reprovado."
+  ],
+  "evidence": "Na PR: saída do `--check` passando; saída do `--check` falhando depois de alterar um caractere do arquivo gerado; saída passando de novo depois de restaurar; e `git diff --exit-code packages/shared` limpo depois de regenerar.",
+  "decisions": "O `shared` é TypeScript cru, sem build. Ainda não sabemos se a API compilada (`node dist/main`) consegue carregá-lo em runtime, já que o Node não executa `.ts` dentro de `node_modules`. **Não bloqueia o início.** Se você perceber que não funciona, sinalize na PR. Não troque o modelo do pacote por conta própria (por exemplo, introduzindo `dist`)."
+ },
+ "T-018": {
+  "issue": 30,
+  "title": "Script de deploy e bootstrap de papéis",
+  "state": "OPEN",
+  "objective": "Um único `forge script script/Deploy.s.sol --broadcast` contra o Anvil do compose cria o `ICTAccreditationRegistry` com o admin vindo de `DEPLOYER_PRIVATE_KEY` e concede `ACCREDITATION_AUTHORITY_ROLE` a `AUTHORITY_ADDRESS`. Ao final, imprime as linhas de `.env` (`CONTRACT_ADDRESS` e `CONTRACT_DEPLOY_BLOCK`) que a API vai consumir.",
+  "depends": "Não depende de outra task.",
+  "groups": [
+   {
+    "title": "Critérios de aceite",
+    "items": [
+     {
+      "id": "1n6chfb",
+      "text": "`Deploy.s.sol` lê `DEPLOYER_PRIVATE_KEY` e `AUTHORITY_ADDRESS` (`vm.envAddress`). `DEFAULT_ADMIN_ROLE` vai para `vm.addr(DEPLOYER_PRIVATE_KEY)` e `ACCREDITATION_AUTHORITY_ROLE` para `AUTHORITY_ADDRESS`, no mesmo broadcast."
+     },
+     {
+      "id": "1hsqr20",
+      "text": "Nenhuma outra conta recebe papel. Em especial, `ICT_ROLE` e `AUDITOR_ROLE` não são concedidos aqui."
+     },
+     {
+      "id": "gcodsf",
+      "text": "`AUTHORITY_ADDRESS` ausente ou `address(0)` reverte com mensagem clara, antes de qualquer transação."
+     },
+     {
+      "id": "m8zs1z",
+      "text": "O script imprime `CONTRACT_ADDRESS=0x...` e `CONTRACT_DEPLOY_BLOCK=<número>`, prontos para o `.env`. Nenhuma chave privada é impressa."
+     },
+     {
+      "id": "50qb1r",
+      "text": "`contracts/test/Deploy.t.sol` (novo) usa `vm.setEnv` e prova que: o admin tem `DEFAULT_ADMIN_ROLE`, a autoridade tem o papel dela, o admin **não** tem o papel de autoridade, um terceiro não tem papel nenhum e o endereço zero reverte."
+     },
+     {
+      "id": "tys07b",
+      "text": "Nos testes negativos, use atores nomeados com `makeAddr` e `hasRole` direto. Não dependa de um revert causado por outra coisa."
+     },
+     {
+      "id": "1k5jwkv",
+      "text": "`.env.example` ganha `CONTRACT_DEPLOY_BLOCK=` e `AUTHORITY_ADDRESS=`, vazios e com um comentário de uma linha cada. O README troca o bloco \"Deploy local\" pelo fluxo novo e lista as duas variáveis."
+     },
+     {
+      "id": "1sh37s8",
+      "text": "`forge fmt --check`, `forge build --sizes` e `forge test -vvv` passam."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [
+   "Esquecer `AUTHORITY_ADDRESS` → o script para antes de transmitir, sem deixar um contrato meio configurado.",
+   "Script que concede papel a mais (por exemplo, `ICT_ROLE` ao admin) → reprovado.",
+   "Chave do admin impressa, logada ou colocada em fixture → reprovado. Ela só existe em script e no ambiente de quem roda.",
+   "Nome de variável diferente entre script, `.env.example` e README → reprovado."
+  ],
+  "evidence": "`forge test -vvv` verde e, contra o Anvil (`pnpm infra:up`), a saída do deploy mais `cast call $CONTRACT_ADDRESS \"hasRole(bytes32,address)(bool)\" $(cast keccak ACCREDITATION_AUTHORITY_ROLE) $AUTHORITY_ADDRESS --rpc-url $RPC_URL_LOCAL` devolvendo `true`. Não commite a pasta `broadcast/`.",
+  "decisions": "- De onde sai o `CONTRACT_DEPLOY_BLOCK`. Pode ser o `block.number` do script, que é o bloco simulado, um pouco anterior ao do deploy. É seguro: o leitor de eventos nunca perde evento. A outra opção é o `receipts[0].blockNumber` de `broadcast/Deploy.s.sol/31337/run-latest.json`. Documente a escolha no README."
+ },
+ "T-019": {
+  "issue": 31,
+  "title": "Script de onboarding de ICT e concessão de ICT_ROLE",
+  "state": "OPEN",
+  "objective": "Um operador, fora da API, consegue gerar uma conta EVM nova para uma ICT sem que a chave toque o repositório, o banco ou o log. Com a chave do admin, ele concede `ICT_ROLE` a esse endereço e, se precisar, revoga. As duas operações são idempotentes.",
+  "depends": "Depende da T-018 (#30).",
+  "groups": [
+   {
+    "title": "Critérios de aceite",
+    "items": [
+     {
+      "id": "103s9z7",
+      "text": "`contracts/script/new-ict-account.sh --out <arquivo>` usa `cast wallet new`, grava a chave **só** em `<arquivo>`, com permissão `600`, e imprime **apenas** o endereço."
+     },
+     {
+      "id": "nlmx0w",
+      "text": "O script recusa `--out` já existente ou dentro do repositório git (`git rev-parse --show-toplevel`), sai com erro e não gera conta."
+     },
+     {
+      "id": "1vewbzw",
+      "text": "O shell usa `set -euo pipefail` e `umask 077`, e não usa `set -x`. O JSON do `cast` nunca é ecoado."
+     },
+     {
+      "id": "jpgewu",
+      "text": "`GrantICTRole.s.sol` lê `ICT_ACCOUNT`, `CONTRACT_ADDRESS` e `DEPLOYER_PRIVATE_KEY` do ambiente e chama `grantRole(ICT_ROLE, ICT_ACCOUNT)`. Endereço zero reverte antes de transmitir."
+     },
+     {
+      "id": "t7ed8z",
+      "text": "Se a conta já tem o papel, o script não transmite, imprime \"já concedido\" e termina com sucesso. O `hasRole` é checado antes do `startBroadcast`."
+     },
+     {
+      "id": "axi0q0",
+      "text": "`RevokeICTRole.s.sol` faz o inverso, também idempotente."
+     },
+     {
+      "id": "y0eiss",
+      "text": "`contracts/test/ICTRoleScripts.t.sol` prova grant, grant repetido sem efeito, revoke, revoke repetido sem efeito e que um não-admin, com ator nomeado, não consegue conceder. Confira o motivo do revert."
+     },
+     {
+      "id": "1038gjk",
+      "text": "`git grep -n \"PRIVATE_KEY\" -- contracts` mostra só as leituras por `vm.envUint` e o uso em `vm.startBroadcast`. Nada de `--private-key` na linha de comando."
+     },
+     {
+      "id": "1j4ik7r",
+      "text": "O README ganha a seção \"Onboarding de ICT\": gerar, entregar a chave ao ambiente de secrets, conceder, validar com `cast call hasRole` e revogar. Diz também que a chave gerada nunca vai para repo, banco ou log, e que o admin nunca roda a partir da API."
+     },
+     {
+      "id": "1yz3np9",
+      "text": "O README avisa que revogar `ICT_ROLE` tira a permissão de escrita, mas **não** desfaz um `registerICT` já feito. O vínculo `ictRef`↔conta continua, e perder a chave depois do registro é um risco aceito, sem rotação neste ciclo."
+     }
+    ]
+   }
+  ],
+  "warnings": [
+   "Vazamento de chave reprova a task. Isso vale para a chave gerada e para a do admin: nada em stdout, stderr, log, arquivo versionado, histórico do shell ou saída colada na PR."
+  ],
+  "failures": [
+   "Chave aparecendo em stdout ou stderr → reprovado.",
+   "`--out` apontando para dentro do repo → recusado, sem gerar conta.",
+   "Segunda execução do grant → não gasta nonce nem muda estado.",
+   "Teste negativo que usa o admin, ou que reverte por outro motivo → passa pelo motivo errado, reprovado.",
+   "Endereço da ICT junto do nome da instituição em log de CI ou issue pública → evite: o endereço permite ligar a conta à instituição real."
+  ],
+  "evidence": "`forge test -vvv` verde. Para o shell: `grep -c \"$(cat /tmp/x.key)\"` na saída do script imprime `0`, `stat -c %a` imprime `600`, e o mesmo `--out` repetido e o `--out` dentro do repo falham. Contra o Anvil: gerar, conceder, `hasRole` `true`, revogar, `hasRole` `false`. Cole tudo na PR **sem a chave** e apague os arquivos de teste no final.",
+  "decisions": ""
+ },
+ "T-020": {
+  "issue": 32,
+  "title": "Módulo de leitura pública da chain na API",
+  "state": "OPEN",
+  "objective": "O backend ganha um módulo Nest que lê o contrato por um `publicClient` do viem, sem nenhum signer, com a rede escolhida por `CHAIN_ID`. Ele expõe leituras tipadas pela ABI para os outros módulos: `accountByICT`, `ictByAccount`, `hasRole` e o acesso a blocos e logs de que o leitor de eventos vai precisar. A leitura pública passa pela API; o front não fala direto com a chain.",
+  "depends": "Depende da T-017 (#29).",
+  "groups": [
+   {
+    "title": "Critérios de aceite",
+    "items": [
+     {
+      "id": "1a73qs7",
+      "text": "`ChainReadModule` em `apps/api/src/chain/` exporta `ChainReadService` e usa `createPublicClient` com transporte `http`. Sem `privateKeyToAccount`, sem `createWalletClient` e sem ler chave nenhuma."
+     },
+     {
+      "id": "1iu21js",
+      "text": "`CHAIN_ID` `31337` usa `RPC_URL_LOCAL` e `11155111` usa `RPC_URL_SEPOLIA`. Valor ausente, inválido ou fora de `SUPPORTED_CHAINS` derruba a inicialização com erro que cita `CHAIN_ID` e a lista."
+     },
+     {
+      "id": "1y6h09y",
+      "text": "`RPC_URL_*` ou `CONTRACT_ADDRESS` ausente ou inválido (`isAddress`) derruba a inicialização. A mensagem cita o nome da variável, nunca o valor."
+     },
+     {
+      "id": "iarn13",
+      "text": "A função pura `resolveChainConfig(env)` é exportada de `chain.config.ts`, para a T-021 (#33) reutilizar. A configuração vem do `ConfigService`, sem `process.env` direto."
+     },
+     {
+      "id": "1lvxgpw",
+      "text": "`getAccountByIctRef`, `getIctRefByAccount` e `hasRole` usam `readContract` com a ABI do `shared`. Endereço zero e `bytes32` zero viram `null`."
+     },
+     {
+      "id": "1gcacts",
+      "text": "`ictRef` que não é hex de 32 bytes e `account` inválido lançam erro de domínio antes de qualquer chamada de rede. Nenhum método aceita CNPJ ou nome."
+     },
+     {
+      "id": "15v0rup",
+      "text": "`getBlockNumber()`, `getChainId()` e `getContractLogs({ fromBlock, toBlock })` existem, e o `publicClient` não é exportado. `getLogs` fixa o `address` no `CONTRACT_ADDRESS`, não filtra evento e devolve `blockNumber`, `transactionHash`, `logIndex`, `topics` e `data`."
+     },
+     {
+      "id": "842fbp",
+      "text": "Janela inválida (`fromBlock > toBlock`, bloco negativo) lança erro antes da rede."
+     },
+     {
+      "id": "lp8zbe",
+      "text": "O client é injetado pelo token `PUBLIC_CLIENT`. Os testes Jest, sem rede, cobrem a seleção de rede, `CHAIN_ID` inválido, zero → `null`, entrada inválida, os argumentos passados ao `readContract` e ao `getLogs` e o repasse de `getChainId`/`getBlockNumber`."
+     },
+     {
+      "id": "adql83",
+      "text": "Sobre `getCurrentStatus`, só um comentário de uma linha no serviço. Nada de método ou código morto."
+     },
+     {
+      "id": "fbn824",
+      "text": "`ChainReadModule` é importado no `AppModule`. `.env.example` e `apps/api/package.json` não mudam."
+     },
+     {
+      "id": "1kps6ab",
+      "text": "`node -e \"require('./apps/api/dist/chain/chain-read.service.js')\"` (ajuste o caminho) roda depois do build sem erro de módulo ou de `.ts`."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [
+   "`CHAIN_ID=1` → a API não sobe.",
+   "Consulta a uma ICT não registrada → `null`, não o endereço zero.",
+   "Log com o par `ictRef`/conta consultado → evite. O log de erro leva só método, rota, status e correlationId.",
+   "Reaproveitar este módulo para escrever → reprovado. Leitura e assinatura ficam separadas."
+  ],
+  "evidence": "`pnpm -r lint`, `pnpm -r build` e `pnpm -r test` verdes. `git grep -nE \"privateKeyToAccount|createWalletClient|PRIVATE_KEY|SIGNER_KEYS\" -- apps/api/src/chain` vazio. Saída do `node -e \"require(...)\"` colada na PR.",
+  "decisions": "Ainda não se sabe se a API compilada consegue carregar o `shared` (TypeScript cru) em runtime. Um dos critérios abaixo testa isso. **Não bloqueia o início.** Se falhar, pare e sinalize na PR. Não mude o modelo do `shared` nesta task."
+ },
+ "T-021": {
+  "issue": 33,
+  "title": "Módulo de signers operacionais",
+  "state": "OPEN",
+  "objective": "A API carrega as chaves operacionais do ambiente, recusa subir se alguma delas pertencer ao admin e entrega o `walletClient` da conta certa para o usuário autenticado. A chave nunca aparece em log, resposta ou erro. Esta task ainda não chama nenhuma função de domínio do contrato.",
+  "depends": "Depende da T-012 (#16), da T-017 (#29) e da T-020 (#32)",
+  "groups": [
+   {
+    "title": "Critérios de aceite",
+    "items": [
+     {
+      "id": "1rf0gq8",
+      "text": "`OPERATIONAL_SIGNER_KEYS` (`0xEndereco:0xChave,...`) é validada: rejeita entrada sem `:`, hex inválido, chave sem 32 bytes, endereço inválido e duplicados. O erro informa o **índice** da entrada, nunca o conteúdo."
+     },
+     {
+      "id": "1af4axd",
+      "text": "O endereço derivado da chave (`privateKeyToAccount`) tem que bater com o declarado (`getAddress`). Se não bater, a API não sobe."
+     },
+     {
+      "id": "7w6zw6",
+      "text": "No `OnModuleInit`, cada endereço passa por `ChainReadService.hasRole(DEFAULT_ADMIN_ROLE, ...)`. Se algum for admin, a API não sobe, e o erro cita o endereço e a variável, nunca a chave. Falha de rede nessa checagem também impede a subida."
+     },
+     {
+      "id": "1c2um93",
+      "text": "Variável vazia ou ausente: a API sobe com zero signers e loga só a **quantidade**. Nenhum endereço vai para o log."
+     },
+     {
+      "id": "sl2m8c",
+      "text": "`getSignerFor({ walletAddress, role })` escolhe o signer pelo `walletAddress` do token validado (T-012 (#16)), comparando sem diferenciar maiúsculas, e devolve `account` e `walletClient` montados com `resolveChainConfig`. O endereço nunca vem do corpo da requisição."
+     },
+     {
+      "id": "1yhhnxr",
+      "text": "`DEFAULT_ADMIN_ROLE` é sempre recusado. Só `ICT_ROLE` e `ACCREDITATION_AUTHORITY_ROLE` têm signer; `AUDITOR_ROLE` não assina."
+     },
+     {
+      "id": "1gbke69",
+      "text": "Sem signer para o endereço → `SignerNotConfiguredError`, no envelope padrão, sem chave, sem a lista de endereços e sem o endereço consultado no corpo."
+     },
+     {
+      "id": "l9qlk2",
+      "text": "As contas ficam em campo privado (`#signers`), e as strings brutas não são retidas depois do parse. Teste prova que `JSON.stringify`, `util.inspect(..., { depth: 5 })` e `message`/`stack` dos erros não contêm nenhuma chave de teste."
+     },
+     {
+      "id": "piyt9",
+      "text": "Só existe a escrita controlada `writeAs(signer, { functionName, args })`, com `abi` e `address` fixos e `writeContract`. Nada de `signMessage` ou `sendTransaction` livres."
+     },
+     {
+      "id": "1rbc9lg",
+      "text": "`git grep -nE \"DEPLOYER_PRIVATE_KEY\" -- apps/api` vazio. `DEFAULT_ADMIN` aparece só na checagem de `hasRole`."
+     },
+     {
+      "id": "1pyzuu5",
+      "text": "`.env.example` ganha `OPERATIONAL_SIGNER_KEYS=` vazio, com o comentário \"contas de TESTE em dev; em produção vem do ambiente de secrets; nunca a chave do admin\". O README explica o formato."
+     },
+     {
+      "id": "16j3jqg",
+      "text": "Testes Jest sem rede, com client de leitura falso e só chaves públicas do Anvil marcadas como \"conta de teste\". `pnpm -r lint`, `build` e `test` verdes."
+     }
+    ]
+   }
+  ],
+  "warnings": [
+   "Vazamento de chave reprova a task. Qualquer caminho que registre, serialize ou devolva uma chave privada, e qualquer leitura da chave do admin dentro da API, é motivo de reprovação."
+  ],
+  "failures": [
+   "Signer que é admin → a API não sobe. No teste, o client falso devolve `true` só para esse endereço, e o teste confere que a mensagem cita esse endereço, e não um erro de parse.",
+   "RPC fora do ar na subida → a API não sobe.",
+   "Endereço do signer recebido do cliente → reprovado.",
+   "Chave em banco, fixture ou seed → reprovado.",
+   "`console.log` em `apps/api/src/signers` → reprovado."
+  ],
+  "evidence": "Testes verdes, com os casos acima, e a saída vazia dos `git grep` de `DEPLOYER_PRIVATE_KEY` e de `console.(log|debug|info)` colada na PR.",
+  "decisions": ""
+ },
+ "T-022": {
+  "issue": 34,
+  "title": "Cadastro de ICT off-chain e geração do ictRef",
+  "state": "OPEN",
+  "objective": "A autoridade (ou o administrador) cadastra uma ICT pela API. A identidade real (CNPJ, razão social, contatos) fica só no Postgres, o backend gera o `ictRef` aleatório de 32 bytes e a ICT nasce ligada ao seu único usuário signatário e ao `walletAddress` dele. Nada vai para a rede. Esta é a primeira rota de negócio, então o guard por papel (`@Roles(...)`) nasce aqui.",
+  "depends": "Depende da T-012 (#16) e da T-013 (#17).",
+  "groups": [
+   {
+    "title": "Critérios de aceite",
+    "items": [
+     {
+      "id": "npn0ls",
+      "text": "`POST /icts` em `apps/api/src/icts/` exige JWT válido (sem token, 401)."
+     },
+     {
+      "id": "f1m46c",
+      "text": "Aceita só `ACCREDITATION_AUTHORITY_ROLE` e `DEFAULT_ADMIN_ROLE`. Há teste de 403 autenticando de fato como `ICT_ROLE` e como `AUDITOR_ROLE`, não só omitindo o token."
+     },
+     {
+      "id": "onlu0o",
+      "text": "DTO com `class-validator`: `razaoSocial`, `cnpj` (14 dígitos, aceita máscara e grava só dígitos), `contatos`, `signatario.email`, `signatario.senhaInicial` (mín. 12) e `signatario.walletAddress`. Campo extra → 400."
+     },
+     {
+      "id": "16dqul9",
+      "text": "Uma única `prisma.$transaction` cria o `User` (`ICT_ROLE`, endereço normalizado com `getAddress`, senha em Argon2id com os parâmetros da ADR-002) e a `ICT`. Teste com falha forçada na segunda escrita prova que nada fica gravado."
+     },
+     {
+      "id": "9il46y",
+      "text": "`ictRef` = `0x` + 64 hex de `crypto.randomBytes(32)`, gerado por função sem parâmetros. Teste do formato `^0x[0-9a-f]{64}$` e de que duas chamadas diferem."
+     },
+     {
+      "id": "1c1efpz",
+      "text": "A resposta 201 traz só `id`, `ictRef`, `razaoSocial`, `walletAddress` e `signatarioId`."
+     },
+     {
+      "id": "7ennm0",
+      "text": "Mesmo `cnpj`, e-mail ou `walletAddress` → 409 genérico, sem linha nova (um teste para cada)."
+     },
+     {
+      "id": "1vkygpv",
+      "text": "`GET /icts` (paginado) e `GET /icts/:id`, para os mesmos dois papéis, devolvem só `id`, `ictRef`, `razaoSocial` e `walletAddress`."
+     },
+     {
+      "id": "12q72bv",
+      "text": "Nenhum log (nem o do filtro de erro) contém CNPJ, razão social, contatos, e-mail ou senha. Teste espia o `Logger` num 409."
+     },
+     {
+      "id": "1njjqd2",
+      "text": "As três rotas no Swagger (`/docs`) com `@ApiBearerAuth()`."
+     },
+     {
+      "id": "1bb5xkb",
+      "text": "Testes sem banco (Prisma falso); `pnpm -r lint`, `pnpm -r build` e `pnpm -r test` passam."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [
+   "Usuário com `ICT_ROLE` ou `AUDITOR_ROLE` tenta cadastrar → 403.",
+   "Cadastro repetido → 409, sem dizer qual campo colidiu.",
+   "Segunda escrita da transação falha → nem `User` nem `ICT` ficam no banco.",
+   "`ictRef` derivado de CNPJ, nome ou contador → reprovado.",
+   "Faltou campo no schema? Não crie migration aqui: o model é da T-013 (#17). Se `cnpj` não for `@unique`, cheque dentro da transação e avise.",
+   "O vínculo ICT/usuário/conta/`ictRef` não tem operação de troca. Não invente endpoint para isso; trocar a conta exige nova ADR."
+  ],
+  "evidence": "`pnpm -r test` verde e, com a API no ar e o seed aplicado: login como `authority@credenciamento.local`, `POST /icts` com sucesso, mesmo corpo de novo devolvendo 409, e o mesmo `POST` com usuário da ICT devolvendo 403.",
+  "decisions": "Não bloqueia o início; siga o padrão indicado. - **Ordem endereço x cadastro:** o endereço da conta é gerado antes pelo script da T-019 (#31) e informado no `POST /icts`. - **Senha inicial e quem cadastra:** a autoridade informa `senhaInicial` e repassa por fora; o administrador também pode cadastrar."
+ },
+ "T-023": {
+  "issue": 35,
+  "title": "Registro on-chain da ICT pelo backend",
+  "state": "OPEN",
+  "objective": "A API registra na chain o `ictRef` de uma ICT já cadastrada: o backend assina `registerICT(ictRef)` com o signer da conta da ICT, espera o recibo, confere o evento `ICTRegistered(ictRef, account)` e atualiza o banco. Repetir o pedido nunca registra duas vezes nem deixa a ICT presa.",
+  "depends": "Depende da T-019 (#31), da T-020 (#32), da T-021 (#33) e da T-022 (#34).",
+  "groups": [
+   {
+    "title": "Critérios de aceite",
+    "items": [
+     {
+      "id": "14ltt9f",
+      "text": "Migration não destrutiva em `ICT`: bloco, `transactionHash`, `logIndex`, conta on-chain, data da projeção, enum `RegistrationDivergence { ACCOUNT_MISMATCH, LOG_REPLACED }`, `registroEnvioTxHash` e `registroEnvioIniciadoEm`."
+     },
+     {
+      "id": "wdcu4c",
+      "text": "Função pura `aplicarIctRegistered(ictAtual, log)` em `apps/api/src/icts/ict-registered.projection.ts`, devolvendo a mutação ou `null`. **Compartilhada com a T-025 (#37): quem mergear primeiro cria campos, enum e função; o outro reutiliza, sem recriar nem renomear.** Um teste por ramo, sem Prisma."
+     },
+     {
+      "id": "1dkwyjj",
+      "text": "Conta sem `ICT_ROLE` → 409, sem envio."
+     },
+     {
+      "id": "1bu1d5o",
+      "text": "Reserva condicional em `registroEnvioIniciadoEm`: duas chamadas simultâneas geram um único `writeContract`."
+     },
+     {
+      "id": "87n3qd",
+      "text": "Recibo com sucesso: o log `ICTRegistered` é decodificado do próprio recibo (ABI da T-017 (#29)), `ictRef` e `account` são conferidos, aplica-se `aplicarIctRegistered` e lê-se `accountByICT(ictRef)`. Log ausente ou diferente → `ACCOUNT_MISMATCH`."
+     },
+     {
+      "id": "6ym24r",
+      "text": "Revert limpa os dois campos de envio e responde 422 só com o nome do erro (`Unauthorized`, `AlreadyExists`, `InvalidInput`)."
+     },
+     {
+      "id": "1e270nh",
+      "text": "Idempotência, um teste por caso: já registrada → 200 sem envio; já na chain com hash de envio → aplica aquele recibo; já na chain sem hash → 202 \"aguardando o indexador\"; envio em andamento → espera o recibo; outra conta na chain → `ACCOUNT_MISMATCH`, 409."
+     },
+     {
+      "id": "1mbvrtc",
+      "text": "Mesmo log aplicado duas vezes → `null` na segunda."
+     },
+     {
+      "id": "1josb45",
+      "text": "`POST /icts/me/registro-onchain` só para `ICT_ROLE`, responde `{ estado, txHash }`; 403 para os outros três papéis (um teste cada); ICT inexistente → 404."
+     },
+     {
+      "id": "1uwkwge",
+      "text": "`GET /icts/:id` passa a trazer `estado`, `transactionHash` e `registrationDivergence`."
+     },
+     {
+      "id": "6607z7",
+      "text": "Testes sem rede e sem banco; `pnpm -r lint`, `pnpm -r build` e `pnpm -r test` passam."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [
+   "`AlreadyExists`: o serviço não tenta \"consertar\"; marca divergência e para.",
+   "Outra conta com `ICT_ROLE` registra o `ictRef` antes (o mempool é público) → divergência.",
+   "Processo morre entre a reserva e o hash → 409 \"em andamento\"; por ora a correção é manual.",
+   "Teste que só afirma \"recibo com sucesso\" sem conferir os dois valores do evento → reprovado.",
+   "Chave, `OPERATIONAL_SIGNER_KEYS`, CNPJ ou razão social em log ou resposta → reprovado. Teste espia o `Logger`."
+  ],
+  "evidence": "`pnpm -r test` verde e o roteiro no Anvil: deploy (T-018 (#30)), onboarding (T-019 (#31)), cadastro (T-022 (#34)), login da ICT, `POST /icts/me/registro-onchain`, depois `cast call $CONTRACT_ADDRESS \"accountByICT(bytes32)(address)\" <ictRef>`, e a segunda chamada sem novo envio.",
+  "decisions": "**Quem dispara o registro:** o usuário signatário da ICT, autenticado (padrão), ou a autoridade no onboarding. **Não bloqueia o início:** o serviço `registrarIct` independe de quem chama; só a rota depende. Enquanto não houver decisão, siga o padrão."
+ },
+ "T-024": {
+  "issue": 36,
+  "title": "Leitor de eventos do contrato com checkpoint",
+  "state": "OPEN",
+  "objective": "A API ganha um worker que lê os logs do contrato em janelas de blocos, a partir de `CONTRACT_DEPLOY_BLOCK` e até a profundidade de confirmação configurada, decodifica cada um com a ABI de `packages/shared`, entrega aos handlers registrados e grava um checkpoint no Postgres. Reiniciar a API retoma de onde parou, sem pular nem repetir blocos. Nenhuma regra de domínio nasce aqui, só o mecanismo.",
+  "depends": "Depende da T-017 (#29) e da T-020 (#32).",
+  "groups": [
+   {
+    "title": "Critérios de aceite",
+    "items": [
+     {
+      "id": "tgd4kd",
+      "text": "`model IndexerCheckpoint` com chave por `chainId` + endereço do contrato (minúsculas), `lastProcessedBlock` em `BigInt` e `updatedAt`; migration commitada. Novo `CONTRACT_ADDRESS` gera outro checkpoint, que recomeça no bloco do deploy."
+     },
+     {
+      "id": "1v8dq12",
+      "text": "Sem checkpoint, lê a partir de `CONTRACT_DEPLOY_BLOCK`; com checkpoint em `N`, a partir de `N + 1`."
+     },
+     {
+      "id": "1smiogt",
+      "text": "Teto = `latest - INDEXER_CONFIRMATIONS` (com 100 e 12, o maior bloco pedido é 88). Se `latest` for menor que a margem, não lê nada e não falha. Nenhum número fixo de confirmações para Sepolia no código."
+     },
+     {
+      "id": "m71whd",
+      "text": "Janelas de até `INDEXER_BLOCK_RANGE`: deploy 0, teto 2500 e janela 1000 geram `0-999`, `1000-1999`, `2000-2500`, e o checkpoint termina em 2500."
+     },
+     {
+      "id": "hz6f3l",
+      "text": "Cada log é decodificado e entregue ao handler do seu `eventName`, em ordem de `(blockNumber, logIndex)`, com `args`, `blockNumber`, `transactionHash` e `logIndex`. Log de tópico desconhecido não derruba o ciclo."
+     },
+     {
+      "id": "19nq83r",
+      "text": "Evento sem handler é ignorado (log debug) e o checkpoint avança."
+     },
+     {
+      "id": "16s6nfa",
+      "text": "O checkpoint só avança depois que todos os handlers da janela terminam. Se um lança erro, não avança, o erro é logado sem payload e a janela se repete no próximo ciclo. Teste dos dois lados."
+     },
+     {
+      "id": "1uckg2a",
+      "text": "Interface de handler (`eventName`, `handle(event)`) e `IndexerHandlerRegistry` exportado pelo `IndexerModule`. Dois handlers para o mesmo evento → erro na inicialização."
+     },
+     {
+      "id": "v2z4vm",
+      "text": "Sem `CONTRACT_ADDRESS` ou `CONTRACT_DEPLOY_BLOCK`, avisa uma vez e não agenda nada; a API sobe e o `test:e2e` segue verde. No `OnModuleDestroy`, nenhum timer fica pendente."
+     },
+     {
+      "id": "q8d3nm",
+      "text": "Ciclos não se sobrepõem: se o anterior ainda roda, o novo é pulado (teste com handler lento)."
+     },
+     {
+      "id": "to2nc2",
+      "text": "`.env.example` com as três variáveis comentadas; README do `apps/api` explica checkpoint e reindexação (apagar a linha)."
+     },
+     {
+      "id": "eek19z",
+      "text": "Testes sem Postgres e sem rede; `pnpm -r lint`, `pnpm -r build` e `pnpm -r test` passam."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [
+   "Decidir \"já processei\" por contagem de linhas ou outra heurística → reprovado. O progresso é o checkpoint.",
+   "Checkpoint gravado só no fim do ciclo: grave após cada janela.",
+   "Testar só um `getLogs` feliz não basta: cubra várias janelas e a retomada entre ciclos.",
+   "Log com objeto do banco ou dado de `User` → reprovado. Erro de handler leva só `eventName`, `blockNumber`, `transactionHash` e identificador do ciclo.",
+   "`ts-jest` não compila o import de `packages/shared`? Corrija a configuração do Jest; não copie a ABI."
+  ],
+  "evidence": "`pnpm --filter ./apps/api test -- indexer` e `pnpm -r test` verdes, migration aplicada com `prisma migrate dev`, e os logs sintéticos dos testes montados a partir da ABI real da T-017 (#29).",
+  "decisions": "Os nomes `INDEXER_CONFIRMATIONS`, `INDEXER_BLOCK_RANGE` e `INDEXER_POLL_INTERVAL_MS` são propostos aqui. Padrões sugeridos: `0`, `1000` e `5000`. Mudou algum? Justifique no PR."
+ },
+ "T-025": {
+  "issue": 37,
+  "title": "Projeção do evento ICTRegistered",
+  "state": "OPEN",
+  "objective": "Quando o contrato emite `ICTRegistered(ictRef, account)`, a ICT correspondente no Postgres passa a guardar bloco, hash da transação, posição do log e conta on-chain, sem duplicar nada se o mesmo log chegar de novo. Divergência entre banco e chain é gravada e alertada, e a chain prevalece. É o primeiro handler do indexador e o molde dos próximos.",
+  "depends": "Depende da T-024 (#36) e da T-013 (#17).",
+  "groups": [
+   {
+    "title": "Critérios de aceite",
+    "items": [
+     {
+      "id": "uu3181",
+      "text": "**Campos e função compartilhados com a T-023 (#35): quem mergear primeiro cria; o outro reutiliza.** Se a T-023 (#35) já está na `main`, esta task só importa `aplicarIctRegistered` de `apps/api/src/icts/ict-registered.projection.ts` e não cria migration. Se esta mergear antes, cria no mesmo caminho e com os mesmos nomes."
+     },
+     {
+      "id": "x5jib4",
+      "text": "Nesse caso, a migration adiciona em `ICT` campos anuláveis: bloco (`BigInt`), `transactionHash`, `logIndex` (`Int`), conta on-chain, data da projeção e `registrationDivergence` (enum `RegistrationDivergence { ACCOUNT_MISMATCH, LOG_REPLACED }`), com comentário no schema: projeção derivada, não autoritativa (ADR-001)."
+     },
+     {
+      "id": "f1fxa",
+      "text": "`IctRegisteredHandler` registrado no `IndexerHandlerRegistry` para `ICTRegistered`. ICT sem confirmação e conta igual à vinculada (sem diferenciar maiúsculas) → grava os campos, divergência nula."
+     },
+     {
+      "id": "1od3eh9",
+      "text": "Mesmo log (`transactionHash` + `logIndex`) entregue duas vezes → o teste afirma um único `update`."
+     },
+     {
+      "id": "imoka9",
+      "text": "Conta do log diferente da vinculada → grava a conta do log, marca `ACCOUNT_MISMATCH`, log `error` com `ictRef`, conta do log e `transactionHash`. Não lança erro."
+     },
+     {
+      "id": "awk9wh",
+      "text": "ICT já confirmada com outro log → sobrescreve, marca `LOG_REPLACED`, log `warn`. Não lança erro."
+     },
+     {
+      "id": "180b3wd",
+      "text": "`ictRef` desconhecido → não cria nada, não lança erro, log `error`, e o checkpoint segue."
+     },
+     {
+      "id": "xdbryn",
+      "text": "\"Registrada\" é decidido pelo par `transactionHash`/`logIndex`; nenhum campo novo se chama `status`."
+     },
+     {
+      "id": "10fozv5",
+      "text": "`ictRef` do log vai para minúsculas antes da busca. Nenhum log com CNPJ, razão social, e-mail ou `walletAddress` do `User`."
+     },
+     {
+      "id": "16dejrn",
+      "text": "Reprocessar do zero (checkpoint apagado) produz o mesmo estado final."
+     },
+     {
+      "id": "184hjvb",
+      "text": "Testes sem rede e sem Postgres; `pnpm -r lint`, `pnpm -r build` e `pnpm -r test` passam."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [
+   "Teste só do caminho feliz → insuficiente. Cubra sem confirmação, confirmada e divergente, e a transição entre eles.",
+   "As duas guardas (mesmo log; outro log) precisam de testes separados: remover qualquer uma delas tem que quebrar um teste.",
+   "Outra conta tomou o `ictRef` antes do registro legítimo: aparece aqui como `ACCOUNT_MISMATCH`. Não trate como impossível.",
+   "Corrigir divergência sobrescrevendo `User.walletAddress` → reprovado. Só registra e alerta.",
+   "Comparar endereço por igualdade direta de string: a viem devolve endereço com checksum.",
+   "Handler que lança erro trava o checkpoint para sempre naquele bloco."
+  ],
+  "evidence": "`pnpm --filter ./apps/api test -- icts` e `pnpm -r test` verdes, incluindo um teste de integração com o `IndexerService` da T-024 (#36) e um client falso emitindo um `ICTRegistered` sintético. Opcional: no Anvil, registrar uma ICT e ver a linha ganhar bloco e hash.",
+  "decisions": "Se a T-022 (#34) já tiver criado o módulo de ICT em `apps/api/src/icts/`, o handler entra nele. Se não, crie `icts-projection.module.ts`. Não deixe dois módulos de ICT."
+ },
+ "T-026": {
+  "issue": 38,
+  "title": "Upload dos documentos da solicitação e hash do conjunto documental",
+  "state": "OPEN",
+  "objective": "O usuário signatário da ICT envia os documentos da solicitação pela API para o bucket privado. Cada arquivo fica com hash e metadados no Postgres, e a API calcula o hash do conjunto documental (o futuro `documentHash`) de forma determinística e verificável por terceiros. Nada vai para a chain.",
+  "depends": "Depende da T-012 (#16) e da T-013 (#17).",
+  "groups": [
+   {
+    "title": "Critérios de aceite",
+    "items": [
+     {
+      "id": "mft6zb",
+      "text": "`POST /icts/me/documentos` (multipart: `arquivo`, `categoria`) só para `ICT_ROLE`, na ICT do usuário. Sem token 401; os outros três papéis 403 (um teste cada); sem ICT 404."
+     },
+     {
+      "id": "134opn8",
+      "text": "Chave do objeto `documentos/<crypto.randomUUID()>`. O nome original não é gravado em lugar nenhum: nem metadado S3, nem banco, nem log."
+     },
+     {
+      "id": "1ko4ppo",
+      "text": "Limite de 10 MB (constante nomeada), `application/pdf` conferido pelos primeiros bytes (`%PDF-`) e categoria de lista fechada. Vazio, grande, tipo errado ou categoria inválida → 400/413/415, nada gravado."
+     },
+     {
+      "id": "j3bp3m",
+      "text": "Hash calculado no servidor, gravado como `0x` + 64 hex no model de arquivos da T-013 (#17), com chave, categoria, tamanho e tipo. O 201 traz `id`, `categoria`, `tamanho` e `hash`, nunca a chave."
+     },
+     {
+      "id": "15vqwu1",
+      "text": "Falha do S3 → nenhuma linha no banco; falha do banco → objeto removido. Teste com doubles."
+     },
+     {
+      "id": "13stly8",
+      "text": "Funções puras `montarManifesto(ictRef, arquivos)` e `calcularDocumentHash(manifesto)`, com vetor fixo comentado e propriedades: ordem não importa; mudar conteúdo, categoria ou `ictRef` muda o hash; incluir ou tirar arquivo muda; arquivo igual em categorias diferentes conta duas vezes."
+     },
+     {
+      "id": "cn3tcr",
+      "text": "`GET /icts/me/documentos/conjunto` devolve `{ documentHash, algoritmo, versao, arquivos }`; sem arquivos 404; chamadas repetidas dão o mesmo hash."
+     },
+     {
+      "id": "17uz7o5",
+      "text": "README com a seção \"Hash do conjunto documental\": formato exato e comando para recalcular a partir de arquivos locais."
+     },
+     {
+      "id": "14zyuqq",
+      "text": "Nenhum log com conteúdo, nome, hash por arquivo, chave ou `S3_*`. Teste espia o `Logger`."
+     },
+     {
+      "id": "xg0rsj",
+      "text": "Testes sem MinIO e sem Postgres; `pnpm -r lint`, `pnpm -r build` e `pnpm -r test` passam."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [
+   "Tamanho, tipo e primeiros bytes são três guardas: um teste para cada, falhando só por aquele motivo.",
+   "Hash do conjunto testado só com um arquivo → insuficiente; use 2 e 3.",
+   "Rota de download ou URL pré-assinada → reprovado. O `compose.yaml` não muda e o bucket segue sem acesso anônimo.",
+   "`walletAddress` em log junto de documento ou `ictRef` → reprovado."
+  ],
+  "evidence": "`pnpm -r test` verde e, logado como `ict@credenciamento.local`: `curl` de upload, `curl` do `/conjunto` repetido com o mesmo hash, o objeto no console do MinIO sem nome original, e o hash recalculado à mão pelo comando do README.",
+  "decisions": "**Bloqueia o início.** Hash publicado não tem conserto: sem estas duas decisões, o valor calculado aqui pode não bater com o que a chain e os terceiros recalculam. - **Algoritmo:** `keccak256` (recomendado: o `documentHash` é `bytes32` no contrato e a `viem` já está no repo) ou `sha256` (verificável com `sha256sum`). Um só algoritmo para arquivo e conjunto. - **Composição do conjunto:** recomendado um manifesto UTF-8 separado por `\\n`: `ICT-DOCSET-V1`, depois `ictRef=<0x...>`, depois uma linha `<categoria>:<hash>` por arquivo, ordenadas por categoria e hash. `documentHash` = hash do manifesto. Ficam registrados, sem bloquear: arquivo previsível (formulário padrão) continua adivinhável mesmo dentro do manifesto, e o conjunto segue mutável até existir a etapa de envio."
+ },
+ "T-027": {
+  "issue": 39,
+  "title": "Tela de cadastro de ICT",
+  "state": "OPEN",
+  "objective": "A autoridade (ou o administrador) cadastra uma ICT por um formulário na área interna e acompanha, numa lista e num detalhe, se o registro na rede está pendente, concluído ou divergente, com o comprovante. Nenhuma carteira no navegador: o navegador fala com route handlers do Next, e eles falam com a API.",
+  "depends": "Depende da T-015 (#19), da T-022 (#34) e da T-023 (#35).",
+  "groups": [
+   {
+    "title": "Critérios de aceite",
+    "items": [
+     {
+      "id": "z0wsoq",
+      "text": "Lista em `apps/web/app/(app)/icts/page.tsx`: razão social, `ictRef` abreviado e situação, link \"Cadastrar ICT\", e os estados carregando, vazio (\"Nenhuma ICT cadastrada\"), erro com \"tentar de novo\" e dados."
+     },
+     {
+      "id": "1jrfaly",
+      "text": "Item \"ICTs\" em `ITENS_NAVEGACAO`, ativo em `/icts` e filhas; o teste atual da navegação segue verde."
+     },
+     {
+      "id": "wxejzp",
+      "text": "Formulário em `icts/nova/page.tsx`: razão social, CNPJ, contatos, e-mail do signatário, senha inicial e endereço da conta, com `label` por campo, erro por campo e botão \"Enviando...\" desabilitado. Senha com `type=\"password\"` e `autocomplete=\"new-password\"`. Texto de ajuda avisa que a conta é definitiva para a ICT."
+     },
+     {
+      "id": "hv4wmd",
+      "text": "Envio por `apps/web/app/api/icts/route.ts`, que lê o cookie da T-015 (#19) e chama `POST /icts`. Sucesso → detalhe com aviso; 409 → \"Já existe uma ICT com estes dados\", sem dizer o campo; 403 → falta de permissão; resto → mensagem genérica."
+     },
+     {
+      "id": "1m1o4wg",
+      "text": "Detalhe em `icts/[id]/page.tsx`: razão social, `ictRef` completo com copiar e situação: \"Aguardando registro na rede\", \"Registrada na rede\" (hash abreviado com copiar) ou \"Divergência: requer análise\". Sem as palavras `tx`, `gas`, `wallet`, `bytes32`; cada situação com texto e ícone, não só cor."
+     },
+     {
+      "id": "l75r8x",
+      "text": "Conforme a decisão: botão \"Atualizar\" (padrão) ou \"Registrar na rede\" com confirmação (\"Esta ação grava a ICT na rede e não pode ser desfeita\"). O estado exibido vem sempre da API."
+     },
+     {
+      "id": "gmfzem",
+      "text": "403 da API → \"Você não tem permissão para ver esta área\" na lista e no detalhe. A tela não decide permissão por papel lido de cookie."
+     },
+     {
+      "id": "1qh77l1",
+      "text": "CNPJ, contatos e senha não são exibidos nem guardados após o envio; a senha é limpa com sucesso ou erro; nada disso em URL, `console` ou atributo HTML."
+     },
+     {
+      "id": "y5559q",
+      "text": "Ordem de tab, foco visível, `aria-describedby` nos erros, resultado com `role=\"status\"`/`\"alert\"`, contraste AA nos dois temas."
+     },
+     {
+      "id": "oobnxo",
+      "text": "Vitest com `fetch` mockado: lista nos quatro estados, campo vazio, sucesso, 409, 403, detalhe nas três situações e copiar `ictRef`. `pnpm -r lint`, `pnpm -r build` e `pnpm -r test` passam."
+     }
+    ]
+   }
+  ],
+  "warnings": [],
+  "failures": [
+   "Route handler sem cookie → 401 sem chamar a API; com cookie, repassa o `Authorization` e nunca devolve o token.",
+   "Deduzir \"registrada\" pela existência do `ictRef` → reprovado. Teste pendente → registrada.",
+   "`walletAddress` em lista, detalhe, URL ou `console` → reprovado.",
+   "Botão \"trocar conta\" → reprovado.",
+   "Importar `viem`, `wagmi` ou lib nova de formulário → reprovado."
+  ],
+  "evidence": "`pnpm -r test` verde e o roteiro no PR: login como `authority@credenciamento.local`, abrir `/icts`, cadastrar, repetir para ver o 409, abrir o detalhe e conferir a situação, e acessar com usuário da ICT para ver a mensagem de permissão.",
+  "decisions": "**Quem dispara o registro na rede.** Padrão: o próprio usuário da ICT, e então esta tela só acompanha o estado. Na alternativa, a autoridade dispara e o detalhe ganha o botão \"Registrar na rede\". **Não bloqueia o início:** lista, formulário e detalhe são iguais nas duas; só o botão e um route handler mudam. Também em aberto: se a senha inicial virar convite por e-mail, o campo sai do formulário."
+ }
+}
